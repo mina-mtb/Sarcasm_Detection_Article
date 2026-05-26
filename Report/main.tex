@@ -1,0 +1,247 @@
+% ****** Start of file template-TIF360-FYM360-blindtext.tex ******
+%
+% use on Overleaf!!!!
+%
+\documentclass[%
+ reprint,
+ amsmath,amssymb,
+ aps,
+]{revtex4-2}
+
+\usepackage{graphicx}% Include figure files
+\usepackage{dcolumn}% Align table columns on decimal point
+\usepackage{bm}% bold math
+\usepackage[hidelinks]{hyperref}% add hypertext capabilities
+%\usepackage[mathlines]{lineno}% Enable numbering of text and display math
+%\linenumbers\relax % Commence numbering lines
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{booktabs}
+
+\begin{document}
+
+\title{[C] Context-Aware and Retrieval-Augmented Sarcasm Detection in Social Media}% Force line breaks with \\
+
+\author{Mina Tahmasebi Berjouei}
+
+\date{\today}% It is always \today, today,
+             %  but any date may be explicitly specified
+
+\begin{abstract} %%% DO NOT CHANGE!
+Sarcasm detection is difficult because the intended meaning of an utterance can conflict with its literal wording and may depend on the preceding conversation. This project evaluates whether conversational context improves binary sarcasm detection for Reddit comments from the SARC dataset. The central research question is whether a transformer classifier can detect sarcasm more effectively when the input includes both the parent comment and the target reply, and whether retrieval-based evidence improves evaluation or interpretation. A TF-IDF logistic-regression baseline was compared with the same \texttt{distilroberta-base} classifier under two preprocessing strategies: target-reply input only and parent-comment plus target-reply input. A calibrated retrieval-augmented stacker was also evaluated using supervised model probabilities and nearest-neighbor retrieval features. On the held-out test set of 151,496 examples, the transformer with parent-reply input achieved the best F1-score among single models (0.790), compared with 0.779 for the same architecture using reply-only input and 0.712 for TF-IDF. The retrieval-augmented stacker achieved the highest accuracy (0.790) and ROC-AUC (0.871), but its F1-score (0.784) was below the context-aware input setting because it traded recall for precision. These results indicate that conversational context gives a consistent but modest gain, while retrieval is most useful as supporting evidence rather than as a standalone sarcasm classifier.
+
+\begin{description} %%% DO NOT CHANGE!
+\item[Project Topic] %%% DO NOT CHANGE!
+{Sarcasm Detection in Social Media.}
+\item[Teaching Assistant] %%% DO NOT CHANGE!
+{Antonio Ciarlo.}
+\end{description} %%% DO NOT CHANGE!
+\end{abstract}
+
+\maketitle
+
+\section{\label{sec:intro}Introduction} %%% DO NOT CHANGE!
+
+Sarcasm is a form of figurative language in which a speaker's intended meaning differs from the literal surface meaning of the utterance. This makes sarcasm a persistent problem for natural-language classification systems: a reply can contain positive words while expressing criticism, mockery, or disagreement. The difficulty is especially visible in social media, where posts are short, noisy, informal, and strongly dependent on shared conversational background.
+
+Traditional sentiment and text-classification systems often fail on sarcasm because they treat polarity-bearing words as direct evidence of sentiment. Riloff et al. describe sarcasm as a contrast between positive sentiment and a negative situation, which illustrates why isolated word-level cues can be misleading \cite{riloff2013sarcasm}. Human interpretation is also context dependent. Wallace et al. showed that readers require conversational context to infer ironic intent reliably, suggesting that computational systems should not treat sarcasm as a purely sentence-local phenomenon \cite{wallace2014humans}.
+
+This project studies sarcasm detection as a supervised binary classification task over Reddit parent-reply pairs. The motivating hypothesis is that a model given the parent comment and the target reply should identify some sarcastic cases that remain ambiguous when the reply is read alone. The work is grounded in prior context-aware sarcasm research using SARC and related conversational datasets \cite{khodak2018large,hazarika2018cascade,dong2020transformer,baruah2020context}. It also examines whether semantically similar retrieved examples can provide useful evidence for prediction or interpretation. The analysis is intentionally cautious: context is expected to help, but sarcasm also depends on topic knowledge, community norms, author intent, and label noise, so large gains from input construction alone are unlikely.
+
+\section{\label{sec:overview}Overview} %%% DO NOT CHANGE!
+
+Sarcasm detection in social media can be approached with methods ranging from lexical baselines to pre-trained neural models and retrieval-augmented systems. The SARC dataset is appropriate for this comparison because its self-annotated Reddit examples include target comments, parent comments, and binary sarcasm labels \cite{khodak2018large}. This structure makes it possible to compare reply-only classification with parent-reply classification while holding the evaluation split fixed.
+
+Table~\ref{tab:methodsoverview} summarizes the main candidate approaches. The table deliberately separates model architecture from input construction. In particular, the two transformer experiments are not different architectures; they are two preprocessing and input-formatting settings for the same \texttt{distilroberta-base} classifier.
+
+\begin{table*}
+    \caption{{\bf Overview of methods considered for sarcasm detection.} The comparison distinguishes model families from input construction. The transformer row covers both reply-only and parent-reply inputs because these are preprocessing variants of the same architecture, not separate architectures.}
+    \label{tab:methodsoverview}
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}p{2.8cm}p{3.3cm}p{5.4cm}p{5.2cm}@{}}
+    \toprule
+       \textbf{Method family} & \textbf{Use case} & \textbf{Strengths and limitations} & \textbf{Role in this project} \\
+    \midrule
+        TF-IDF + Logistic Regression &
+        Lightweight lexical baseline using target replies only. &
+        Fast, interpretable, and inexpensive to train. It captures surface n-gram patterns, but cannot model semantic incongruity or parent-comment context. &
+        Used as a reproducible lower baseline for measuring the value of transformer representations. \\
+    \midrule
+        Pre-trained Transformer Classifier &
+        Fine-tuning BERT/RoBERTa-style models for binary sarcasm classification \cite{devlin2019bert,liu2019roberta,he2021deberta}. &
+        Captures richer semantic and syntactic information than n-gram models. Its performance depends on input construction: reply-only input tests what can be learned without context, while parent-reply input tests conversational context. &
+        Main architecture. The same \texttt{distilroberta-base} classifier is evaluated under context-free and context-aware input settings. \\
+    \midrule
+        Retrieval-Augmented Evidence &
+        Retrieving semantically similar labeled examples before or during classification \cite{lewis2020retrieval,yu2023retrieval}. &
+        Can support interpretation and provide neighbor-label features. However, semantic similarity does not necessarily imply the same sarcasm label, so retrieval quality is a central limitation. &
+        Used as an auxiliary component in a calibrated stacker and as a diagnostic retrieval-only comparison. \\
+    \midrule
+        Large Language Model Prompting &
+        Zero-shot or few-shot prompting with explicit parent-reply context and retrieved examples. &
+        Can produce natural-language explanations, but quantitative evaluation is costly and sensitive to prompt design, model version, and missing prediction files \cite{zhang2024sarcasmbench}. &
+        Prompt templates were prepared for qualitative comparison. No completed large-language-model prediction file was available in the final outputs, so no LLM metric is reported. \\
+    \bottomrule
+    \end{tabular}
+\end{table*}
+
+\textbf{Selected approach.} The main supervised method is a \texttt{distilroberta-base} classifier fine-tuned for sarcasm detection. The central experimental control is input construction: the reply-only setting uses the target comment alone, while the parent-reply setting concatenates the parent comment and target reply with the tokenizer's separator tokens. This design isolates the effect of context while keeping the architecture, training configuration, and evaluation split comparable. Retrieval is treated as an additional evidence source rather than a replacement for supervised learning.
+
+\section{\label{sec:method}Method} %%% DO NOT CHANGE!
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=\textwidth]{academic_figures/method_pipeline.pdf}
+    \caption{{\bf Research pipeline.} Raw SARC Reddit data are cleaned and split into shared train, validation, and test partitions. The pipeline then constructs reply-only, parent-reply, and retrieval inputs. TF-IDF logistic regression and a fixed \texttt{distilroberta-base} transformer are trained or applied under these input settings; retrieval features are combined with supervised probabilities in a calibrated stacker. Evaluation uses the held-out test set, followed by metric comparison and error analysis.}
+    \label{fig:selectedmethod}
+\end{figure*}
+
+\subsection*{Data Preprocessing}
+
+The dataset consists of Reddit comments labeled as sarcastic or non-sarcastic through the SARC self-annotation scheme \cite{khodak2018large}. Each example includes a target reply, its parent comment, and a binary label. Preprocessing removed incomplete rows, normalized text fields, removed duplicate parent-reply-label triplets, and preserved the same stratified split for all experiments. The final held-out test set contains 151,496 examples, with 75,759 sarcastic and 75,737 non-sarcastic instances. This near-balanced split is why accuracy and balanced accuracy are very similar in the final results.
+
+\subsection*{TF-IDF Baseline}
+
+The classical baseline represents the target reply with TF-IDF features over unigrams and bigrams, using a maximum vocabulary of 100,000 terms and minimum document frequency of 2. A logistic-regression classifier with balanced class weights is trained on these features. This baseline is intentionally context-free: it uses only the target reply and provides an interpretable reference point for the transformer experiments.
+
+\subsection*{Transformer Classifier and Input Construction}
+
+The neural model is \texttt{distilroberta-base}, fine-tuned for binary classification with a maximum sequence length of 256 tokens, batch size 8, and 3 epochs. The same architecture is evaluated under two input construction strategies:
+
+\begin{itemize}
+    \item \textit{Context-free preprocessing/input:} the tokenizer receives only the target reply.
+    \item \textit{Context-aware preprocessing/input:} the tokenizer receives the parent comment and target reply as a paired sequence separated by special tokens.
+\end{itemize}
+
+This distinction is important for interpreting the results. The experiments do not compare two transformer architectures; they compare the same transformer architecture under different preprocessing and input settings. Any performance difference between these two rows is therefore attributable to the additional conversational context and the way the input is constructed.
+
+\subsection*{Retrieval-Augmented Component}
+
+The retrieval component embeds parent-reply pairs with \texttt{BAAI/bge-base-en-v1.5} and retrieves the five nearest training examples using a FAISS index over normalized embeddings. Two retrieval outputs are used. First, a retrieval-only k-nearest-neighbor diagnostic predicts the label from a similarity-weighted vote over the five neighbors. Second, a calibrated logistic-regression stacker combines supervised probabilities with retrieval features: TF-IDF probability, reply-only transformer probability, parent-reply transformer probability, retrieval kNN probability, top-neighbor label, top-neighbor similarity, mean and standard deviation of neighbor similarities, similarity gap, and positive-neighbor count. The stacker decision threshold was 0.56, selected on a stratified calibration subset.
+
+Prompt files for zero-shot and few-shot large-language-model evaluation were also generated for a balanced set of 100 examples, but the final outputs contain only empty prediction fields for those prompts. They are therefore treated as reproducibility artifacts for future qualitative evaluation, not as quantitative results.
+
+\subsection*{Evaluation Metrics}
+
+All primary models are evaluated on the same held-out test set using accuracy, balanced accuracy, precision, recall, F1-score, macro-F1, weighted-F1, ROC-AUC, and average precision. Precision, recall, and F1-score are reported for the sarcastic class. ROC-AUC and average precision evaluate ranking quality independently of the fixed classification threshold.
+
+\section{\label{sec:results}Results and Discussion} %%% DO NOT CHANGE!
+
+\subsection*{Overall Model Comparison}
+
+Table~\ref{tab:results} reports the final metrics from \texttt{sarcasm\_final\_outputs/metrics\_comparison.csv}. The architecture column lists actual model families, while the input column describes preprocessing and input construction. The best value in each metric column is highlighted.
+
+\begin{table*}
+    \caption{{\bf Final test-set performance.} The two transformer rows use the same \texttt{distilroberta-base} architecture and differ only in preprocessing/input construction. Metrics are evaluated on 151,496 held-out examples. Precision, recall, and F1-score are for the sarcastic class.}
+    \label{tab:results}
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}p{2.8cm}p{4.4cm}cccccc@{}}
+    \toprule
+    \textbf{Architecture} & \textbf{Input setting} & \textbf{Acc.} & \textbf{Prec.} & \textbf{Recall} & \textbf{F1} & \textbf{ROC-AUC} & \textbf{AP} \\
+    \midrule
+    TF-IDF + LogReg & Reply-only TF-IDF n-grams & 0.722 & 0.739 & 0.686 & 0.712 & 0.795 & 0.801 \\
+    DistilRoBERTa classifier & Context-free input: target reply only & 0.772 & 0.757 & 0.803 & 0.779 & 0.859 & 0.866 \\
+    DistilRoBERTa classifier & Context-aware input: parent comment + target reply & 0.782 & 0.765 & \textbf{0.816} & \textbf{0.790} & 0.869 & \textbf{0.875} \\
+    Retrieval stacker & Supervised probabilities + retrieval-neighbor features & \textbf{0.790} & \textbf{0.809} & 0.759 & 0.784 & \textbf{0.871} & 0.874 \\
+    \bottomrule
+    \end{tabular}
+\end{table*}
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.95\textwidth]{academic_figures/01_metrics_overview.pdf}
+    \caption{{\bf Primary metric overview.} Accuracy, F1-score, balanced accuracy, and ROC-AUC are shown for the lexical baseline, the same transformer architecture under two input settings, and the retrieval-augmented stacker.}
+    \label{fig:res1}
+\end{figure*}
+
+The TF-IDF baseline reaches 0.722 accuracy and 0.712 F1-score. This is a useful lower reference: lexical n-gram patterns capture some recurrent sarcastic wording, but the model has no access to parent-comment context and cannot represent deeper pragmatic incongruity.
+
+The transformer with reply-only input improves strongly over TF-IDF, reaching 0.772 accuracy and 0.779 F1-score. This gain shows the value of pre-trained contextual representations even before adding conversational context. The reply-only model has higher recall than precision, suggesting that it identifies many sarcastic examples but also over-predicts sarcasm in some ambiguous replies.
+
+Adding the parent comment to the same transformer architecture gives a consistent improvement: accuracy rises from 0.772 to 0.782, F1-score from 0.779 to 0.790, ROC-AUC from 0.859 to 0.869, and average precision from 0.866 to 0.875. In raw counts, the parent-reply input produces 118,537 correct predictions, compared with 117,027 for reply-only input, a net gain of 1,510 correct classifications on the test set. The gain is not large enough to claim that context solves sarcasm detection, but it is consistent across threshold-dependent and ranking metrics.
+
+The retrieval-augmented stacker obtains the highest accuracy (0.790), precision (0.809), and ROC-AUC (0.871), but its F1-score (0.784) is lower than the parent-reply transformer because recall drops to 0.759. This indicates a more conservative classifier: it makes fewer sarcastic predictions, reducing false positives but missing more true sarcastic comments. Whether this is preferable depends on the application. For a moderation or alerting system where false positives are costly, higher precision may be useful; for broad sarcasm analysis, the parent-reply transformer gives a better precision-recall balance.
+
+\subsection*{Metric-Level Analysis}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\columnwidth]{academic_figures/02_f1_accuracy_comparison.pdf}
+    \caption{{\bf Accuracy and F1-score.} The parent-reply input setting gives the highest F1-score among single models, while the retrieval stacker gives the highest accuracy.}
+    \label{fig:res2}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\columnwidth]{academic_figures/03_auc_comparison.pdf}
+    \caption{{\bf ROC-AUC and average precision.} The parent-reply transformer has the highest average precision, while the retrieval stacker has the highest ROC-AUC by a small margin.}
+    \label{fig:res3}
+\end{figure}
+
+Figure~\ref{fig:res2} shows that the main improvement from context is clearer in F1-score than in accuracy. Because the test set is almost perfectly balanced, accuracy is not misleading here, but F1-score is still more informative for the sarcastic class because it combines precision and recall. The parent-reply transformer improves both precision and recall relative to reply-only input, which supports the interpretation that parent context helps the model disambiguate some replies rather than merely shifting the threshold.
+
+Figure~\ref{fig:res3} shows a similar pattern for ranking metrics. The parent-reply input setting improves ROC-AUC and average precision over reply-only input. The retrieval stacker slightly improves ROC-AUC over the parent-reply transformer, but average precision is marginally lower. The differences are small, so they should be interpreted as evidence of limited complementarity rather than a decisive advantage for retrieval.
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\columnwidth]{academic_figures/04_precision_recall_f1.pdf}
+    \caption{{\bf Precision, recall, and F1-score.} The stacker is most precise but least sensitive among the transformer-based approaches, while the parent-reply transformer has the best recall and F1-score.}
+    \label{fig:res4}
+\end{figure}
+
+The precision-recall breakdown in Fig.~\ref{fig:res4} explains why the stacker does not win on F1-score. Its precision of 0.809 is substantially higher than the parent-reply transformer's 0.765, but recall falls from 0.816 to 0.759. The stacker therefore learns a stricter decision boundary from the calibrated supervised and retrieval features. This behavior is plausible because the threshold was selected to balance performance on a calibration subset and the retrieval features can strengthen confidence for some obvious cases while failing to recover more subtle sarcastic examples.
+
+\begin{figure*}
+    \centering
+    \includegraphics[width=0.95\textwidth]{academic_figures/05_metrics_heatmap.pdf}
+    \caption{{\bf Complete metric heatmap.} The heatmap summarizes all reported metrics from the final comparison file. The close agreement between accuracy, balanced accuracy, macro-F1, and weighted-F1 reflects the nearly balanced test set.}
+    \label{fig:res5}
+\end{figure*}
+
+The heatmap in Fig.~\ref{fig:res5} reinforces two points. First, the parent-reply transformer is the strongest single architecture/input configuration for F1-score, recall, and average precision. Second, the retrieval stacker shifts the operating point toward precision and accuracy. The overall differences between the two strongest systems are small, which suggests that retrieval-based similarity features add limited new information beyond the supervised models.
+
+\subsection*{Error and Retrieval Analysis}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=\columnwidth]{academic_figures/06_confusion_matrix_best.pdf}
+    \caption{{\bf Confusion matrix for the transformer with parent-reply input.} The model correctly classifies 56,724 non-sarcastic and 61,813 sarcastic examples, with 19,013 false positives and 13,946 false negatives.}
+    \label{fig:res6}
+\end{figure}
+
+The confusion matrix in Fig.~\ref{fig:res6} shows that the parent-reply transformer is more successful at recovering sarcastic examples than non-sarcastic ones. Its recall for sarcasm is 0.816, while the false-positive count remains substantial. This pattern is expected in social media sarcasm detection: many non-sarcastic replies use exaggeration, humor, or community-specific shorthand that resembles sarcastic language.
+
+The full prediction files provide a more detailed view of the context effect. The parent-reply transformer corrects 8,784 examples that the reply-only transformer misses, while the reply-only transformer correctly classifies 7,274 examples that the parent-reply input misses. The net improvement is therefore real but not one-sided. Some parent comments may be uninformative, noisy, or truncated by the 256-token limit; in those cases, extra context can add distraction rather than signal. Across the three supervised systems, 92,768 examples are classified correctly by all models, while 17,838 are missed by all of them, indicating a substantial hard subset that likely includes ambiguous wording, noisy self-annotations, or cases requiring broader world knowledge.
+
+The retrieval-only diagnostic further clarifies the role of retrieval. A similarity-weighted kNN vote over the five nearest retrieved examples reaches only 0.579 accuracy, 0.596 F1-score, and 0.609 ROC-AUC. This is far below all supervised models and shows that semantic similarity alone is a weak sarcasm signal. Retrieved examples are still useful for interpretation and can provide features for stacking, but they should not be treated as reliable labels. The retrieved-example files also show mixed neighbor labels for individual queries, which is consistent with the idea that two comments can be semantically similar while differing in pragmatic intent.
+
+\subsection*{Limitations}
+
+Several limitations remain. First, SARC labels are self-annotated through the ``/s'' convention, so the dataset may miss unmarked sarcasm and may contain community-specific labeling habits. Second, the results are Reddit-specific; style, moderation norms, and sarcasm conventions may differ on other platforms. Third, the transformer input is limited to 256 tokens, so long parent comments can be truncated before the model sees the most relevant context. Fourth, the retrieval component depends on embedding similarity, which does not directly encode pragmatic intent. Finally, the large-language-model prompt files were prepared but not evaluated quantitatively because no completed prediction file was present in the final outputs. These limitations make the results useful as a controlled comparison, but not as a claim of general sarcasm understanding.
+
+\section{\label{sec:conclusion}Conclusions and Outlook} %%% DO NOT CHANGE!
+
+This project compared lexical, transformer-based, and retrieval-augmented approaches for sarcasm detection in Reddit conversations. The main empirical finding is that conversational context helps, but the effect is measured rather than dramatic. With the architecture held fixed, the \texttt{distilroberta-base} classifier improves from 0.779 F1-score with reply-only input to 0.790 F1-score with parent-reply input. This supports the project hypothesis that sarcasm often depends on the relationship between a reply and its conversational context.
+
+The retrieval-augmented stacker gives the highest accuracy and ROC-AUC, but it does so by increasing precision and reducing recall. The retrieval-only diagnostic performs much worse than supervised classification, which suggests that retrieved examples are best used as supporting evidence and explanation material rather than as a primary classifier. Overall, the strongest practical choice depends on the desired operating point: the parent-reply transformer is preferable for balanced sarcasm detection, while the stacker is preferable when conservative high-precision predictions are more valuable.
+
+Future work should test richer context beyond the immediate parent comment, including earlier thread turns, subreddit information, and author-level signals. It would also be useful to evaluate carefully controlled large-language-model prompts using the saved prompt templates, perform human review of ambiguous errors, and test whether the conclusions transfer to other platforms or languages. These extensions would address the remaining gap between benchmark classification and robust interpretation of sarcasm in real social media conversations.
+
+\section{\label{sec:Contribution}Contributions} %%% DO NOT CHANGE!
+
+Mina Tahmasebi Berjouei conceived the project, designed the experimental pipeline, implemented data preprocessing, trained and evaluated the models, generated the retrieval and prompt artifacts, produced the final figures, and wrote the report.
+
+\section{\label{sec:COI}Conflict of Interest} %%% DO NOT CHANGE!
+
+The author declares no conflict of interest. This project is academic coursework for the Advance Machine Learning with Neural Networks course at Chalmers University of Technology, and no financial, commercial, or professional relationship influenced the research design, execution, or reporting.
+
+\section{\label{sec:datacode}Data and Code Availability} %%% DO NOT CHANGE!
+
+The SARC-based Reddit sarcasm dataset used in this project is available from Kaggle at \url{https://www.kaggle.com/datasets/danofer/sarcasm}. Source code, data-preparation scripts, model training code, evaluation utilities, generated figures, and final result artifacts are available at \url{https://github.com/mina-mtb/Sarcasm-Detection}. The final metric table, prediction files, retrieval diagnostics, retrieved-example files, and prompt templates were used as the basis for the Results and Discussion section.
+
+\bibliography{biblio-TIF360-FYM360} %%% DO NOT CHANGE!
+% Produces the bibliography via BibTeX.
+
+\end{document}

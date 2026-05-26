@@ -1,0 +1,309 @@
+\documentclass[final, 12pt]{beamer}
+
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+  \setsansfont{Times New Roman}
+}{
+  \IfFontExistsTF{TeX Gyre Termes}{
+    \setmainfont{TeX Gyre Termes}
+    \setsansfont{TeX Gyre Termes}
+  }{
+    \setmainfont{Latin Modern Roman}
+    \setsansfont{Latin Modern Roman}
+  }
+}
+\IfFontExistsTF{Consolas}{
+  \setmonofont{Consolas}
+}{
+  \setmonofont{Latin Modern Mono}
+}
+\renewcommand{\familydefault}{\rmdefault}
+
+\usepackage[orientation=portrait,size=a3,scale=1.00]{beamerposter}
+\usetheme{gemini}
+\usecolortheme{nott}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{ragged2e}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.misc}
+\usepackage{hyperref}
+\usepackage{soul}
+
+% Print-oriented typography overrides for the poster.
+\setbeamerfont{normal text}{family=\PosterFont,size*={11.7}{12.9}}
+\setbeamerfont{block body}{family=\PosterFont,size*={11.7}{12.9}}
+\setbeamerfont{block title}{family=\OpenSans,size*={14.2}{15.5},series=\bfseries}
+\setbeamerfont{caption}{size*={10.6}{11.6}}
+\setbeamerfont{headline author}{size*={12.6}{13.8}}
+\setbeamerfont{headline institute}{size*={11.2}{12.3}}
+\setbeamerfont{footline}{family=\OpenSans,size*={10.8}{11.8}}
+
+% ====================
+% Layout: TWO-COLUMN
+% ====================
+
+\newlength{\sepwidth}
+\newlength{\colwidth}
+\setlength{\sepwidth}{0.025\textwidth}
+\setlength{\colwidth}{0.46\textwidth}
+\newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
+
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+\newcounter{posterfigure}
+\newcounter{postertable}
+\newcommand{\figcaption}[2]{%
+  \refstepcounter{posterfigure}\label{#1}%
+  \par\vspace{0.25ex}{\fontsize{10.6}{11.6}\selectfont
+  \textbf{Figure~\theposterfigure.} #2}\par
+}
+\newcommand{\tablecaption}[2]{%
+  \refstepcounter{postertable}\label{#1}%
+  \par\vspace{0.25ex}{\fontsize{10.6}{11.6}\selectfont
+  \textbf{Table~\thepostertable.} #2}\par
+}
+\newcommand{\key}[1]{\textbf{\textcolor{accentpurple}{#1}}}
+\newcommand{\best}[1]{\textbf{\textcolor{black}{#1}}}
+\newcommand{\smallbody}{\fontsize{11.2}{12.3}\selectfont}
+\newcommand{\tablesize}{\fontsize{10.1}{10.9}\selectfont}
+\renewcommand{\arraystretch}{0.95}
+
+
+% ====================
+% Title
+% ====================
+
+\title{Context-Aware and Retrieval-Augmented\\Sarcasm Detection in Social Media}
+\author{Mina Tahmasebi Berjouei \inst{1} \and Antonio Ciarlo \inst{2} \and Giovanni Volpe \inst{3}}
+
+\institute[Chalmers]{
+\inst{1} Department of Electrical Engineering, Chalmers University of Technology,
+\href{mailto:berjouei@chalmers.se}{berjouei@chalmers.se}\\
+\inst{2} Department of Physics, University of Gothenburg,
+\href{mailto:antonio.ciarlo@physics.gu.se}{antonio.ciarlo@physics.gu.se}\\
+\inst{3} Department of Physics, University of Gothenburg,
+\href{mailto:giovanni.volpe@physics.gu.se}{giovanni.volpe@physics.gu.se}
+}
+
+\footercontent{
+Sarcasm detection via context and retrieval \hfill
+Balanced held-out evaluation on Reddit \hfill
+Chalmers University of Technology
+}
+
+\logoleft{\makebox[0.30\paperwidth][c]{\raisebox{-0.5\height}{\includegraphics[height=3.8cm]{logos/chalmers_emblem_white.png}}\hspace{0.50cm}\raisebox{-0.5\height}{\includegraphics[height=4.4cm]{logos/university_of_gothenburg_emblem_white.png}}}}
+% Logo command commented out to avoid undefined macro issues with some themes
+
+\begin{document}
+\sloppy
+\setlength{\emergencystretch}{3em}
+
+\begin{frame}[t]
+\begin{columns}[t,totalwidth=\textwidth]
+
+% ====================
+% COLUMN 1: Left Side
+% ====================
+
+\begin{column}{\colwidth}
+
+  % --- INTRODUCTION (SHORTENED & SHARPENED) ---
+  \begin{alertblock}{Introduction}
+    Sarcasm is a pragmatic phenomenon whereby intended meaning opposes the literal utterance. In social media, reliable detection depends on \key{conversational context}, prior discourse, and shared assumptions. Classification of isolated comments is brittle and often fails to capture pragmatic nuance.
+    
+    This work evaluates whether parent-comment context and retrieved labeled evidence improve binary sarcasm detection on Reddit. We hypothesize that context provides critical incongruity signals, while retrieval enhances robustness through precedent-based evidence.
+  \end{alertblock}
+
+  % --- DATA & TASK ---
+  \begin{block}{Data \& Task}
+    Binary classification of Reddit replies as sarcastic or non-sarcastic using a balanced held-out split from the SARC dataset \cite{khodak2018large} (Table~\ref{tab:data}). The dataset is partitioned into 70\% training, 15\% validation, and 15\% test.
+    
+    \vspace{0.4ex}
+    \begin{center}
+    \tablesize
+    \setlength{\tabcolsep}{3.8pt}
+    \begin{tabular}{@{}lr@{}}
+      \toprule
+      \textbf{Property} & \textbf{Value} \\
+      \midrule
+      Test examples & 151,496 \\
+      Sarcastic / Non-sarcastic & 75,759 / 75,737 \\
+      Target & Reply comment \\
+      Context & Parent comment \\
+      Label & Sarcastic / Non-sarcastic \\
+      \bottomrule
+    \end{tabular}
+    \tablecaption{tab:data}{Held-out evaluation: balanced binary classification task.}
+     \end{center}
+    \end{block}
+
+  % --- METHODS (WITH EXPERIMENTAL DETAILS) ---
+  \begin{block}{Methods}
+    We explore complementary model variants spanning lexical, contextual, and retrieval-based approaches (Table~\ref{tab:families}). Our architecture integrates a transformer classifier with a calibrated retrieval stacker, as depicted in Figure~\ref{fig:pipeline}. This dual-pathway design leverages both neural encoding and evidence-based voting to improve sarcasm detection robustness.
+        \vspace{-0.15cm}
+    \begin{center}
+    \tablesize
+    \setlength{\tabcolsep}{3pt}
+    \begin{tabularx}{\linewidth}{@{}L{0.25\linewidth}L{0.35\linewidth}Y@{}}
+      \toprule
+      \textbf{Model} & \textbf{Description} & \textbf{Project role} \\
+      \midrule
+      TF-IDF + Logistic Regression & TF-IDF features with logistic regression classifier & Baseline lexical model. \\
+      DistilRoBERTa (reply only) & Transformer encoding of reply text only & Reply-only contextual baseline. \\
+      DistilRoBERTa (parent + reply) & Transformer encoding of parent and reply together & Context-aware prediction. \\
+      Calibrated retrieval stacker & Neighbor voting over retrieved evidence & Retrieval-based calibration. \\
+      \bottomrule
+    \end{tabularx}
+      \tablecaption{tab:families}{Complementary model variants explored in the project.}
+    \end{center}
+  
+    
+    \vspace{-0.4cm}
+    \begin{center}
+    \begin{tikzpicture}[
+        scale=0.94,
+        transform shape,
+        node distance=0.30cm and 0.2cm,
+        box/.style={draw=darkpurple, line width=0.8pt, rounded corners=4pt, align=center,
+          minimum height=0.74cm, text width=3.1cm, fill=white,
+          font=\fontsize{10.2}{10.8}\selectfont},
+        hilite/.style={box, fill=palepurple},
+        outputbox/.style={box, fill=softgray},
+        arrow/.style={-{Latex[length=2.5mm,width=2mm]}, line width=0.9pt, draw=darkpurple}
+      ]
+      
+      % Top Input Stack
+      \node[hilite] (thread) {Reddit thread\\parent + reply};
+      \node[box, below=0.5cm of thread] (prep) {Clean \& format\\paired input};
+      
+      % Parallel Tracks (Left: Classifier, Right: Retrieval)
+      % Negative horizontal distances overlap the bounding boxes slightly to keep the total width narrow
+      \node[hilite, below left=0.5cm and -0.1cm of prep] (clf) {Transformer\\classifier};
+      \node[outputbox, below=0.5cm of clf] (prob) {Model\\probabilities};
+      
+      \node[box, below right=0.5cm and -0.1cm of prep] (index) {Retrieval index\\labeled ex.};
+      \node[box, below=0.5cm of index] (nn) {Top-$k$\\neighbors};
+      
+      % Bottom Merge Stack
+      \path (prob) -- (nn) coordinate[midway] (mergepoint);
+      \node[hilite, below=1.0cm of mergepoint] (stacker) {Calibrated\\stacker};
+      \node[outputbox, below=0.5cm of stacker] (pred) {prediction};
+
+      % Flow Arrows
+      \draw[arrow] (thread) -- (prep);
+      \draw[arrow] (prep) -- (clf.north);
+      \draw[arrow] (prep) -- (index.north);
+      \draw[arrow] (clf) -- (prob);
+      \draw[arrow] (index) -- (nn);
+      \draw[arrow] (prob.south) -- (stacker.north);
+      \draw[arrow] (nn.south) -- (stacker.north);
+      \draw[arrow] (stacker) -- (pred);
+    \end{tikzpicture}
+    \figcaption{fig:pipeline}{Dual-input pipeline: context supplies discourse signals; retrieval supplies calibrated evidence.}
+    \end{center}
+  \end{block}
+
+  \vspace{-0.45cm}
+  \begin{block}{Experimental Setup}
+    \begin{tabularx}{\linewidth}{@{}L{0.2\linewidth}Y@{}}
+      \textbf{TF-IDF} & 1--2 grams, 100k features, balanced logistic regression. \\
+      \textbf{Transformer} & \texttt{distilroberta-base}, 256 tokens, batch size 8, 3 epochs. \\
+      \textbf{Training} & Learning rate \(2\times10^{-5}\), weight decay 0.01, AdamW via Hugging Face Trainer, best checkpoint by validation F1. \\
+      \textbf{Retrieval} & BGE-base embeddings, cosine/inner-product search, top-\(k=5\), up to 50k indexed train rows. \\
+      \textbf{Stacker} & Logistic regression over model probabilities and neighbor features; threshold 0.56 calibrated for accuracy. \\
+    \end{tabularx}
+  \end{block}
+
+\end{column}
+
+\separatorcolumn
+
+% ====================
+% COLUMN 2: Right Side
+% ====================
+
+\begin{column}{\colwidth}
+  % --- MAIN FINDINGS BOX (VISUAL CENTER) ---
+
+  \begin{exampleblock}{Main Findings}
+    \begin{center}
+    {\fontsize{11.6}{12.7}\selectfont
+    \key{Context-aware DistilRoBERTa:} Highest recall (0.816) and F1 score (0.790), indicating improved detection of sarcastic replies.
+    
+    \key{Retrieval stacker:} Highest accuracy (0.790), precision (0.809), and AUC (0.871), reflecting more conservative and well-calibrated predictions.
+    }
+    \end{center}
+
+    \vspace{0.3ex}
+    \begin{center}
+    \tablesize
+    \setlength{\tabcolsep}{2.8pt}
+
+    \begin{tabular}{@{}lccccc@{}}
+      \toprule
+      \textbf{Model} & \textbf{Acc.} & \textbf{Prec.} & \textbf{Rec.} & \textbf{F1} & \textbf{AUC} \\
+      \midrule
+      TF-IDF + LogReg & .722 & .739 & .686 & .712 & .795 \\
+      DistilRoBERTa (reply) & .772 & .757 & .803 & .779 & .859 \\
+      DistilRoBERTa (context) & .782 & .765 & \best{.816} & \best{.790} & .869 \\
+      Retrieval stacker & \best{.790} & \best{.809} & .759 & .784 & \best{.871} \\
+      \bottomrule
+    \end{tabular}
+            \tablecaption{tab:results}{Held-out test performance: context improves recall; retrieval improves precision and ranking.}
+    \end{center}
+
+  \end{exampleblock}
+    \vspace{-0.2cm}
+
+  % --- RESULTS ---
+  \begin{block}{Results}
+\vspace{-0.2cm}
+      \begin{center}
+      \includegraphics[width=0.94\linewidth]{figures/confusion_matrices_all_models.pdf}
+        \vspace{-0.2cm}
+    \figcaption{fig:metrics}{Confusion matrices reconstructed for all four evaluated models from the held-out test-set class counts and aggregate precision/recall.}
+  \end{center}
+  \end{block}
+  
+  \vspace{-0.5cm}
+
+  % --- DISCUSSION (SHORTENED) ---
+  \begin{block}{Discussion}
+    No single model dominates all metrics. The \key{retrieval stacker} emphasizes precision/AUC with more conservative sarcasm predictions. The \key{context-aware transformer} achieves higher recall/F1, identifying more sarcastic replies at lower precision.
+    
+    \textbf{Why context helps:} Sarcasm often arises from incongruity between a reply and its parent context \cite{wallace2014humans,riloff2013sarcasm}. The transformer model detects this contrast, improving recall from 0.803 to 0.816.
+    
+    \textbf{Why retrieval helps:} Retrieval favors conservative predictions (.809 precision, .871 AUC); report split: .791 Acc., .810 Prec., .785 F1 (\(n=75{,}748\)).
+  \end{block}
+  \vspace{0.2cm}
+
+  % --- CONCLUSION (POLISHED) ---
+  \begin{alertblock}{Conclusion}
+    Context-aware modeling maximizes recall when sensitivity to sarcasm is the priority. Retrieval-augmented stacking delivers the best overall accuracy and precision for applications that require balanced ranking performance. Future work should investigate longer conversational histories, external knowledge sources, and stronger retrieval architectures to address failure cases that require world knowledge.
+  \end{alertblock}
+
+  % --- REFERENCES (COMPACT) ---
+  \begin{block}{References}
+      \vspace{-0.05cm}
+    \fontsize{8.6}{9.4}\selectfont\raggedright
+    \begin{thebibliography}{6}
+      \bibitem{khodak2018large} Khodak et al. A large self-annotated corpus for sarcasm. LREC, 2018.
+      \bibitem{devlin2019bert} Devlin et al. BERT: Pre-training of deep bidirectional transformers. NAACL-HLT, 2019.
+      \bibitem{liu2019roberta} Liu et al. RoBERTa: A robustly optimized BERT pretraining approach. arXiv:1907.11692, 2019.
+      \bibitem{lewis2020retrieval} Lewis et al. Retrieval-augmented generation for knowledge-intensive NLP tasks. NeurIPS, 2020.
+      \bibitem{wallace2014humans} Wallace et al. Humans require context to infer ironic intent. ACL, 2014.
+      \bibitem{riloff2013sarcasm} Riloff et al. Sarcasm as contrast between positive sentiment and negative situation. EMNLP, 2013.
+    \end{thebibliography}
+  \end{block}
+
+\end{column}
+
+\end{columns}
+\end{frame}
+
+\end{document}
